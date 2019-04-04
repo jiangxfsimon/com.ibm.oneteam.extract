@@ -7,7 +7,16 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.annotation.Resource;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -22,6 +31,7 @@ import com.ibm.extract.config.Configure;
 import com.ibm.extract.enums.ErrorCode;
 import com.ibm.extract.enums.Request;
 import com.ibm.extract.exception.CommonException;
+import com.ibm.extract.model.EntityInfo;
 
 /**
  * @author FuDu
@@ -115,17 +125,78 @@ public class HttpClient {
 					getFields);
 			if (searchResults.hasMore()) {
 				SearchResult searchResult = (SearchResult) searchResults.next();
-				System.out.println(searchResult);
+//				System.out.println("++"+searchResult);
 				Attributes attributes = searchResult.getAttributes();
 				Attribute attribute = attributes.get(key);
-				value = attribute.get().toString();
+				if(attribute!=null) {
+					value = attribute.get().toString();
+				}else {
+					value="";
+				}	
 			}
 		} catch (NamingException e) {
 			throw new CommonException(ErrorCode.requestBluePageError);
 		}
 		return value;
 	}
-
+	
+	public Map<String,String> requestBluePageForMap(List<String> serialCcs) {
+		String value = null;
+		
+		Map<String, String> jobResponses=new HashMap<String, String>();
+		try {
+			SearchControls getFields = new SearchControls();
+			getFields.setSearchScope(SearchControls.SUBTREE_SCOPE);
+			DirContext dirContext = initDirContext();
+			SearchResult searchResult=null;
+						
+			for(String serialCc:serialCcs) {
+				Instant start=Instant.now();
+				NamingEnumeration<SearchResult> searchResults = dirContext.search(configure.getBluepageLdapBase(), String.format(Request.filterUid.value(),serialCc),
+						getFields);
+				if (searchResults.hasMore()) {
+					searchResult = (SearchResult) searchResults.next();
+//					System.out.println("++"+searchResult);
+					Attributes attributes = searchResult.getAttributes();
+					Attribute attribute = attributes.get("jobresponsibilities");
+					if(attribute!=null) {
+						value = attribute.get().toString();
+					}else {
+						value="";
+					}
+				}
+				jobResponses.put(serialCc, value);
+				System.out.println(Duration.between(start, Instant.now()));
+			}		
+		} catch (NamingException e) {
+			throw new CommonException(ErrorCode.requestBluePageError);
+		}
+		return jobResponses;
+	}
+	
+//	public String requestBluePageToEntity(String filter, String key) {
+//		String value = null;
+//		try {
+//			SearchControls getFields = new SearchControls();
+//			getFields.setSearchScope(SearchControls.SUBTREE_SCOPE);
+//			DirContext dirContext = initDirContext();
+//			NamingEnumeration<SearchResult> searchResults = dirContext.search(configure.getBluepageLdapBase(), filter,
+//					getFields);
+//			if (searchResults.hasMore()) {
+//				SearchResult searchResult = (SearchResult) searchResults.next();
+//				System.out.println("++"+searchResult);
+//				Attributes attributes = searchResult.getAttributes();
+//				EntityInfo entity=new EntityInfo(cnum, empNotes, funLeaderNotes, bpMgrNotes, jobRespons, hrOrgCode, hrOrgDisplay, hrUnitId)
+//				Attribute attribute = attributes.get(key).get().toString();
+//				value = attribute.get().toString();
+//			}
+//		} catch (NamingException e) {
+//			throw new CommonException(ErrorCode.requestBluePageError);
+//		}
+//		return value;
+//	}
+	
+	
 	/**
 	 * @param notes
 	 *            从 bluePage 取回的 notes

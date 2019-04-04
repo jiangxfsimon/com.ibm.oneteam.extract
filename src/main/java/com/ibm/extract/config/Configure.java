@@ -70,6 +70,25 @@ public class Configure {
 	private String bluePageInitialValue;
 	@Value("${bluepage.url.value}")
 	private String bluePageUrlValue;
+	@Value("${organization.api}")
+	private String organizationApi;
+	@Value("${generate.FilePath}")
+	private String generatedFilePath;
+	
+	//generate.FilePath
+	
+	public String getOrganizationApi() {
+		return organizationApi;
+	}
+	public String getGeneratedFilePath() {
+		return generatedFilePath;
+	}
+	public void setGeneratedFilePath(String generatedFilePath) {
+		this.generatedFilePath = generatedFilePath;
+	}
+	public void setOrganizationApi(String organizationApi) {
+		this.organizationApi = organizationApi;
+	}
 	public String getAppName() {
 		return appName;
 	}

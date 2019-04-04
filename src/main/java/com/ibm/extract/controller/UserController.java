@@ -63,11 +63,19 @@ public class UserController {
 		String result = null;
 		if (type.equals("email")) {
 			String filter = String.format(Request.filterEmail.value(), "cddufu@cn.ibm.com");
+			System.out.println(Request.filterEmail.value());
 			result = httpClient.formatNotes(httpClient.requestBluePage(filter, Request.notesMail.value()));
 		} else if (type.equals("cnum")) {
 			String filter = String.format(Request.filterCnum.value(), "066383", "672");
 			result = httpClient.requestBluePage(filter, Request.emailAddress.value());
+		}else if(type.equals("job")) {
+			String filter = String.format(Request.filterCnum.value(), "066383", "672");
+			result = httpClient.requestBluePage(filter, Request.jobRespons.value());
+		}else if(type.equals("uid")) {
+			String filter = String.format(Request.filterUid.value(), "066383672");
+			result=httpClient.requestBluePage(filter, Request.jobRespons.value());
 		}
+		
 		return result;
 	}
 	
