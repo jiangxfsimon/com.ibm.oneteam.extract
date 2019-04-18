@@ -11,8 +11,10 @@ public enum Request {
 	OK(200),
 	filterCnum("(&(ibmserialnumber=%s)(employeecountrycode=%s))"),
 	filterEmail("(emailaddress=%s)"),
+	filterUid("(uid=%s)"),
 	notesMail("notesemail"),
-	emailAddress("emailaddress");
+	emailAddress("emailaddress"),
+	jobRespons("jobresponsibilities");
 	private int code;
 	private String value;
 	private Request() {}

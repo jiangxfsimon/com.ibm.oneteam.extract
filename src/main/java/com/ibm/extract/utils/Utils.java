@@ -30,7 +30,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Resource;
-import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FileUtils;
@@ -41,13 +40,11 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
-import org.apache.xmlbeans.impl.xb.xsdschema.Public;
 import org.springframework.stereotype.Component;
-import org.springframework.test.context.ContextLoader;
-import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.common.collect.Lists;
+import com.ibm.db2.jcc.am.i;
 import com.ibm.extract.config.Configure;
 import com.ibm.extract.enums.DateFormat;
 import com.ibm.extract.enums.ErrorCode;
@@ -72,98 +69,74 @@ public class Utils {
 	@Resource
 	private HttpClient httpClient;
 	
-	private static final int threadNum=10;
-	
-	
+	private static final int threadNum=20;
+
 	public static final String[] AccessFor= {"APP Name","CNUM","Employee LN ID","Employee LN ID(GET)","Employee LN ID(BP)","JobResponsibilities:","HrOrganizationDisplay:","HrUnit ID:"};
 	public static final String[] UplineFor= {"APP Name","CNUM","Employee LN ID","Employee LN ID(GET)","Employee LN ID(BP)","Chain","JobResponsibilities:","HrOrganizationDisplay:","HrUnit ID:"};
 	
-	public void ExcelWriter(String appCode,List<EntityInfo> list1,List<EntityInfoChain> list2)  {
+	public <T> void ExcelWriter(String appCode,List<T> list)  {
 		Instant start=Instant.now();
-		int[] sheet1CellLength=new int[AccessFor.length];
-		int[] sheet2CellLength=new int[UplineFor.length];
+		int[] maxCellNumber= {0};
+		String fileName=null;
+		String[] title=null;
+		if(list.get(0) instanceof EntityInfoChain) {
+			maxCellNumber=new int[UplineFor.length];
+			title=UplineFor;
+			fileName="UplineFor";
+		}else {
+			maxCellNumber=new int[AccessFor.length];
+			title=AccessFor;
+			fileName="AccessFor";
+		}
 		SXSSFWorkbook wb=null;
 		FileOutputStream out =null;
-		
 		try {
 			wb = new SXSSFWorkbook(200);
-			out= new FileOutputStream("C:\\Users\\XiaoFengJiang\\Desktop\\"+appCode+".xlsx");
+			out= new FileOutputStream("C:\\Users\\XiaoFengJiang\\Desktop\\"+fileName+appCode+".xlsx");
 			
-			SXSSFSheet sh = wb.createSheet("AccessFor"+appCode);
+			SXSSFSheet sh = wb.createSheet(fileName+appCode);
 			sh.createFreezePane(0,1);
 //			sh.trackAllColumnsForAutoSizing();
-			
 			
 			CellStyle style=wb.createCellStyle();
 			style.setFillForegroundColor(IndexedColors.ORANGE.getIndex());
 			style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 			//write the title
 			Row row0=sh.createRow(0);
-			for(int i=0;i<AccessFor.length;i++) {
+			for(int i=0;i<title.length;i++) {
 				Cell cell =row0.createCell(i);
-				cell.setCellValue(AccessFor[i]);
+				cell.setCellValue(title[i]);
 				cell.setCellStyle(style);
 			}
-			
-			EntityInfo entityInfo=null;
-			for(int rownum = 0; rownum < list1.size(); rownum++){
-				entityInfo=(EntityInfo) list1.get(rownum);
+			T entity=null;
+			for(int rownum = 0; rownum < list.size(); rownum++){
+				entity=list.get(rownum);
 				
 			    Row row = sh.createRow(rownum+1);
-			    
-			    for(int cellnum = 0; cellnum < AccessFor.length; cellnum++){
+			    String cellContent=null;
+			    for(int cellnum = 0; cellnum < title.length; cellnum++){
 //			    	sh.autoSizeColumn(cellnum);
 			        Cell cell = row.createCell(cellnum);
 //			        cell.setCellValue(appCode);
 			        
 			        if(cellnum==0) {
 			        	cell.setCellValue(appCode);
-			        	sh.setColumnWidth(0, appCode.length()*256);
 			        }else {
-//			        	sheet1CellLength
-			        	System.out.println(entityInfo.getAttributeByIndex(cellnum).length()*256);
-				        cell.setCellValue(entityInfo.getAttributeByIndex(cellnum));
-				        sh.setColumnWidth(cellnum, entityInfo.getAttributeByIndex(cellnum).length()*256);
+			        	cellContent=((EntityInfo) entity).getAttributeByIndex(cellnum);
+			        	if(null!=cellContent && cellContent.length()>maxCellNumber[cellnum]) {
+			        		maxCellNumber[cellnum]=cellContent.length();
+			        	}
+				        cell.setCellValue(cellContent);
 			        }
 			    }
 			}
-			
-			
-			SXSSFSheet sh1 = wb.createSheet("UplineFor"+appCode);
-			sh1.createFreezePane(0,1);
-			
-		
-			
-			//write the title
-			Row nextRow0=sh1.createRow(0);
-			for(int i=0;i<UplineFor.length;i++) {
-				Cell cell =nextRow0.createCell(i);
-				cell.setCellValue(UplineFor[i]);
-				cell.setCellStyle(style);
+			//set the cell's length
+			maxCellNumber[0]=appCode.length()+3;
+			maxCellNumber[1]=appCode.length()+1;
+			for(int i=0;i<maxCellNumber.length;i++) {
+				sh.setColumnWidth(i, maxCellNumber[i]*256);
+				System.out.println(i+" :"+maxCellNumber[i]);
 			}
-			EntityInfoChain entityInfoChain=null;
-			for(int rownum = 0; rownum < list2.size(); rownum++){
-				entityInfoChain= (EntityInfoChain) list2.get(rownum);
-				
-			    Row row = sh1.createRow(rownum+1);
-			    System.out.println("Entity: "+entityInfoChain);
-			    for(int cellnum = 0; cellnum < UplineFor.length; cellnum++){
-//			    	sh.autoSizeColumn(cellnum);
-			        Cell cell = row.createCell(cellnum);
-//			        cell.setCellValue(appCode);
-			        
-			        if(cellnum==0) {
-			        	cell.setCellValue(appCode);
-//			        	sh.setColumnWidth(0, appCode.length()*256);
-			        }else {
-//			        	System.out.println(":: "+entityInfoChain.getAttributeByIndex(cellnum));
-//			        	System.out.println(entityInfoChain.getAttributeByIndex(cellnum).length()*256);
-				        cell.setCellValue(entityInfoChain.getAttributeByIndex(cellnum));
-//				        sh.setColumnWidth(cellnum, entityInfoChain.getAttributeByIndex(cellnum).length()*256);
-			        }
-			    }
-			}
-			
 			wb.write(out);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -187,8 +160,6 @@ public class Utils {
 			System.out.println(Duration.between(start, Instant.now()));
 			System.out.println("Done");
 		}
-        
-        
 	}
 	public Map<String, String> startBatchThread(String allSerialCcs) {
 		allSerialCcs=allSerialCcs.replaceAll("'", "");
@@ -226,33 +197,34 @@ public class Utils {
 	
 	
 	public Map<String, String> enableThread(String serialCcs) {
-		FetchBpByMultiThread fetchBp=null;
-		Map<String, String> map=new HashMap<String, String>();
-		ExecutorService pool = Executors.newFixedThreadPool(threadNum);
-//		List<FutureTask<Map<String,String>>> result=List<FutureTask<Map<String,String>>>
-		List<Future<Map<String,String>>> futures=new ArrayList<Future<Map<String,String>>>();
-		List<String> serialCcList=Arrays.asList(serialCcs.split(","));
-		List<List<String>> lists=SplitList(serialCcList, threadNum);
-		
-		for(int i=0;i<threadNum;i++) {
-			Future<Map<String,String>> future = pool.submit(
-					fetchBp=new FetchBpByMultiThread(httpClient, lists.get(i))
-			);
-			futures.add(future);
-		}
-		
-		for (Future future : futures) {
-			try {
-				map.putAll((Map<String,String>) future.get());
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			} catch (ExecutionException e) {
-				e.printStackTrace();
+		Map<String, String> map = new HashMap<String, String>();
+		serialCcs = serialCcs.replaceAll("'", "");
+		List<String> serialCcList = Arrays.asList(serialCcs.split(","));
+		if (serialCcList.size() <= 40) {
+			map = httpClient.requestBluePageForMap(serialCcList);
+		} else {
+			List<List<String>> lists = SplitList(serialCcList, threadNum);
+			ExecutorService pool = Executors.newFixedThreadPool(threadNum);
+			List<Future<Map<String, String>>> futures = new ArrayList<Future<Map<String, String>>>();
+			FetchBpByMultiThread fetchBp = null;
+
+			for (int i = 0; i < threadNum; i++) {
+				Future<Map<String, String>> future = pool
+						.submit(fetchBp = new FetchBpByMultiThread(httpClient, lists.get(i)));
+				futures.add(future);
+			}
+			pool.shutdown();
+			for (Future future : futures) {
+				try {
+					map.putAll((Map<String, String>) future.get());
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} catch (ExecutionException e) {
+					e.printStackTrace();
+				}
 			}
 		}
-		pool.shutdown();
 		return map; 
-		 
 	}
 	
 	public static <T> List<List<T>> SplitList(List<T> source, int n) {
@@ -281,7 +253,17 @@ public class Utils {
 		}
 		return list;
 	}
-	
+	public boolean listCompare(List<String> list1,List<String> list2) {
+		if(list1.size()!=list2.size()) {
+			return false;
+		}
+		for(int i=0;i<list1.size();i++) {
+			if(!list1.get(i).equals(list2.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
 	public List<List<String>> linkedSetToArray(List<LinkedHashSet<String>> mgrLink,List<LinkedHashSet<String>> funLeaderLink){
 		List<List<String>> mergedList=new ArrayList<>();
 		if(mgrLink.size()==funLeaderLink.size()) {
@@ -291,8 +273,19 @@ public class Utils {
 				List<String> list1=iteration(link1);
 				LinkedHashSet<String> link2=funLeaderLink.get(i);
 				List<String> list2=iteration(link2);
+				
 				mergedList.add(list1);
-				mergedList.add(list2);
+				if(listCompare(list1, list2)) {
+					mergedList.add(Arrays.asList("DUPLICATE"));//若list相同则标记为duplicate
+				}else {
+					mergedList.add(list2);
+				}
+			}
+			for(List<String> list:mergedList) {
+				for(String string:list) {
+					System.out.print(string+"->");
+				}
+				System.out.println();
 			}
 		}else {
 			throw new RuntimeException("The mgrLink size is not equal funLeaderLink size");
@@ -300,11 +293,21 @@ public class Utils {
 		
 		return mergedList;
 	}
-	
+	public Set<String> getMultiAppUsers(Map<String, List<String>> maps){
+		Set<String> allUsers=new HashSet<>();
+		for(List<String> list:maps.values()) {
+			allUsers.addAll(list);
+		}
+		return allUsers;
+	}
 	public List<EntityInfoChain> buildEntityInfoChain(List<LinkedHashSet<String>> mgrLink,List<LinkedHashSet<String>> funLeaderLink,Map<String, Object> maps,List<OrgCode> orgCodes){
 		List<EntityInfoChain> list=new ArrayList<EntityInfoChain>();
+		Set<String> mgrSerial=new HashSet<String>();
+		Set<String> funSerial=new HashSet<String>();
 //		System.out.println("mgrLink: "+mgrLink.size()+"  funLeaderLink: "+funLeaderLink.size());
 		Map<String, Chain> chainMap=(Map<String, Chain>) maps.get("allEntity");
+		Map<String, String> mgrMap=(Map<String, String>) maps.get("mgrMap");
+		Map<String, String> funLeaderMap=(Map<String, String>) maps.get("funLeaderMap");
 		Map<String, OrgCode> orgCodeMap=listToMap((Collection<OrgCode>) orgCodes);
 		Map<String, String> jobResponses=(Map<String, String>) maps.get("jopResponses");
 
@@ -318,6 +321,9 @@ public class Utils {
 				suffix="GET";
 			}
 			List<String> link=mergedList.get(i);
+			if(link.get(0).equals("DUPLICATE")) {//删除	manager chain和funleader chain相同的部分
+				continue;
+			} else {
 			EntityInfoChain elEntityInfoChain=null;
 			for(int y=0;y<link.size();y++) {
 				String serialCc=link.get(y);
@@ -325,6 +331,8 @@ public class Utils {
 				if(serialCc.startsWith("INVALD")) continue;
 				
 				Chain chain=chainMap.get(serialCc);
+				if(chain.getUser().equals(chain.getManager())) continue;//when the user is Ginni, do not show in excel
+				
 				elEntityInfoChain=new EntityInfoChain(chain.getUser(), chain.getUserNotes(), chain.getFunLeaderNotes(), chain.getFunLeader(), chain.getMgrNotes(), 
 				chain.getManager(), jobResponses.get(serialCc), chain.getBpOrgCode(), orgCodeMap.get(chain.getBpOrgCode()).getHrOrgDisplay(),  orgCodeMap.get(chain.getBpOrgCode()).getHrUnitId());
 				if(y==0) {
@@ -333,25 +341,194 @@ public class Utils {
 					elEntityInfoChain.setChain(prefix+" "+(y+1)+suffix);
 				}
 				list.add(elEntityInfoChain);
+				if(elEntityInfoChain.getChain().contains("BP")) {
+					mgrSerial.add(elEntityInfoChain.getCnum());
+				}
+				if(elEntityInfoChain.getChain().contains("GET")) {
+					funSerial.add(elEntityInfoChain.getCnum());
+				}
+			}
 			}
 		}
+		System.out.println("++++"+mgrSerial);
+//		List<String> missMgrchain=new ArrayList<String>();
+//		List<EntityInfoChain> missMgrFunEntity=new ArrayList<EntityInfoChain>();
+		List<String> mgrfunLeader=null;
 		
+//		List<EntityInfoChain> tempList=list;
+		for(int i=0;i<list.size();i++) {
+			EntityInfoChain entity=list.get(i);
+			if(entity.getChain().contains("BP")||entity.getChain().contains("GET") ) {
+				mgrfunLeader=Arrays.asList(entity.getFunLeaderCnum(),entity.getBpMgrCnum());
+				//============================
+//				String funLeader=entity.getFunLeaderCnum();
+				for(String serialCc:mgrfunLeader) {
+					String temp=serialCc;
+//					if(serialCc.equals("066081838")) {
+//						System.out.println("?????????????????????????");
+//						System.out.println("BP: "+entity.getBpMgrCnum()+"  funLeader: "+entity.getFunLeaderCnum());
+//						System.out.println(entity.getBpMgrCnum().equals(entity.getFunLeaderCnum()));
+//					}
+					if(!entity.getBpMgrCnum().equals(entity.getFunLeaderCnum()) && !mgrSerial.contains(serialCc)) {
+						String tempMgr=serialCc;
+						mgrSerial.add(serialCc);
+//						missMgrchain.add(funLeader);
+						Chain chain=null;
+						EntityInfoChain elEntityInfoChain=null;
+						String setChain=entity.getChain()+"1 ";
+						Integer integer=2;
+						boolean flag=false;
+
+						//to validation if duplicated data exists
+						List<EntityInfoChain> mgrLine=new ArrayList<EntityInfoChain>();
+						boolean doubleLineEquals=true;
+						while(true) {
+							chain=chainMap.get(serialCc);
+//							if(chain.getFunLeader().equals(chain.getManager())) {
+//								funSerial.add(serialCc);
+//							}
+							
+							if(chain.getUser().equals(chain.getManager())) break;//when the user is Ginni, do not show in excel
+							elEntityInfoChain=new EntityInfoChain(chain.getUser(), chain.getUserNotes(), chain.getFunLeaderNotes(), chain.getFunLeader(), chain.getMgrNotes(), 
+							chain.getManager(), jobResponses.get(serialCc), chain.getBpOrgCode(), orgCodeMap.get(chain.getBpOrgCode()).getHrOrgDisplay(),  orgCodeMap.get(chain.getBpOrgCode()).getHrUnitId());
+							System.out.println("elEntityInfoChain:???"+elEntityInfoChain);
+							//validate manager==funleader
+							if(!chain.getManager().equals(chain.getFunLeader())) {
+								doubleLineEquals=false;
+							}
+							if(flag==false) {
+								elEntityInfoChain.setChain(setChain);
+								flag=true;
+							}else {
+								elEntityInfoChain.setChain(setChain+integer+"BP");
+								integer++;
+							}
+							
+//							replace "3 2BP1 1 2GET1 " to "3 2BP1 2GET1 "
+							elEntityInfoChain.setChain(elEntityInfoChain.getChain().replace("1 1 ", "1 "));
+							System.out.println(elEntityInfoChain);
+							mgrLine.add(elEntityInfoChain);
+							String nextMgr=mgrMap.get(serialCc);
+							if(nextMgr!=null ) {
+								mgrSerial.add(nextMgr);
+//								missMgrchain.add(nextMgr);
+								System.out.println("nextMgr: "+nextMgr);
+								serialCc=nextMgr;
+							}else {
+								break;
+							}
+						}
+						if(!doubleLineEquals || !funSerial.contains(tempMgr)) {
+							list.addAll(mgrLine);
+						}
+					}
+					////////////////////////////////////
+//					String manager=funLeader;
+//					if(entity.getFunLeaderCnum().equals(manager)) continue;
+					if(!entity.getBpMgrCnum().equals(entity.getFunLeaderCnum()) && !funSerial.contains(temp)) {
+						String tempFun=temp;
+						funSerial.add(temp);
+//						missMgrchain.add(funLeader);
+						Chain chain=null;
+						EntityInfoChain elEntityInfoChain=null;
+						String setChain=entity.getChain()+"1 ";
+						Integer integer=2;
+						boolean flag=false;
+						
+						//to validation if duplicated data exists
+						List<EntityInfoChain> funLine=new ArrayList<EntityInfoChain>();
+						boolean doubleLineEquals=true;
+						while(true) {
+							chain=chainMap.get(temp);
+							
+							if(chain.getUser().equals(chain.getManager())) break;//when the user is Ginni, do not show in excel
+							elEntityInfoChain=new EntityInfoChain(chain.getUser(), chain.getUserNotes(), chain.getFunLeaderNotes(), chain.getFunLeader(), chain.getMgrNotes(), 
+							chain.getManager(), jobResponses.get(temp), chain.getBpOrgCode(), orgCodeMap.get(chain.getBpOrgCode()).getHrOrgDisplay(),  orgCodeMap.get(chain.getBpOrgCode()).getHrUnitId());
+							//validate manager==funleader
+							if(!chain.getManager().equals(chain.getFunLeader())) {
+								doubleLineEquals=false;
+							}
+							
+							if(flag==false) {
+								elEntityInfoChain.setChain(setChain);
+								flag=true;
+							}else {
+								elEntityInfoChain.setChain(setChain+integer+"GET");
+								integer++;
+							}
+							
+//							replace "3 2BP1 1 2GET1 " to "3 2BP1 2GET1 "
+							elEntityInfoChain.setChain(elEntityInfoChain.getChain().replace("1 1 ", "1 "));
+							System.out.println(elEntityInfoChain);
+							funLine.add(elEntityInfoChain);
+							String nextMgr=funLeaderMap.get(temp);
+							if(nextMgr!=null ) {
+								funSerial.add(nextMgr);
+//								missMgrchain.add(nextMgr);
+								temp=nextMgr;
+							}else {
+								break;
+							}
+						}
+						if(!doubleLineEquals || !mgrSerial.contains(tempFun)) {
+							list.addAll(funLine);
+						}
+						
+					}
+				}
+				
+			}
+//			list=missMgrFunEntity;
+		}
+//		list.addAll(missMgrFunEntity);
+//		System.out.println("missMgrFunEntity: "+missMgrFunEntity);
 		
+		//set tht serialCc as the same user 
 		
-//		for(LinkedHashSet<String> link: mgrLink) {
-//			int linkElementNum=2;
-//			Iterator<String> it = link.iterator();
-//			EntityInfoChain elEntityInfoChain=null;
-//			while(it.hasNext()) {
-//				Chain chain=chainMap.get(it.next());
-//				elEntityInfoChain=new EntityInfoChain(chain.getUser(), chain.getUserNotes(), chain.getFunLeaderNotes(), chain.getFunLeader(), chain.getMgrNotes(), 
-//				chain.getManager(), "", chain.getBpOrgCode(), orgCodeMap.get(chain.getBpOrgCode()).getHrOrgDisplay(),  orgCodeMap.get(chain.getBpOrgCode()).getHrUnitId());
-//				elEntityInfoChain.setChain(linkNum+" "+linkElementNum+"BP");
-//				list.add(elEntityInfoChain);
-//				linkElementNum++;
+//		for(int i=0;i<list.size();i++) {
+//			entity=list.get(i);
+//			if(Pattern.matches("(.*?)\\s$", entity.getChain())) {
+//				serialCc=entity.getCnum();
+//			}else {
+//				entity.setCnum(serialCc);
 //			}
-//			linkNum++;
 //		}
+		
+		//to correct the addition chain's serial and cc 
+		EntityInfoChain entity=null;
+		String serialCc=null;
+		Map<String, String> ChainToSerialNum=new HashMap<>();
+		int recorder=0;
+		
+		for(int i=0;i<list.size();i++) {
+			entity=list.get(i);
+			//to set the original list as the same serial and cc
+			if(Pattern.matches("(.*?)\\s$", entity.getChain())) {
+				serialCc=entity.getCnum();
+			}else {
+				entity.setCnum(serialCc);
+			}
+			//to the the additional chain's serial and cc
+			if(Pattern.matches("(.*?)(GET|BP)1\\s$", entity.getChain())) {
+				recorder=i;
+				break;
+			}
+			ChainToSerialNum.put(entity.getChain(), entity.getCnum());
+		}
+//		System.out.println(";;;;;;;;;;;;;;;;"+ChainToSerialNum);
+		String serialNum=null;
+		for(;recorder<list.size();recorder++) {
+			entity=list.get(recorder);
+			String key=null;
+			if(Pattern.matches("(.*?)(GET|BP)1\\s$", entity.getChain())) {
+				key=entity.getChain().replaceAll("1\\s$", "");
+				serialNum=ChainToSerialNum.get(key);
+				entity.setCnum(serialNum);
+			}else {
+				entity.setCnum(serialNum);
+			}
+			ChainToSerialNum.put(entity.getChain(), serialNum);
+		}
 		
 		return list;
 	}
@@ -467,7 +644,10 @@ public class Utils {
 	}
 	
 	
-	public String removeSpecialEmp(List<String> originalList,String regex) {
+	public String removeSpecialEmp(Collection<String> originalList,String regex) {
+		if(originalList.size()==0) {
+			return "";
+		}
 		String origialString=listToString(originalList);
 		origialString=origialString.replaceAll(regex, "");
 		String formattedStr=origialString.replaceAll(",{2,}", ",");
@@ -592,3 +772,33 @@ public class Utils {
 		}
 	}
 }
+
+
+//compare the manager chain if equals or not
+//StringBuffer mgrBuffer=new StringBuffer();
+//mgrBuffer.append(chain.getManager());
+//StringBuffer funLeaderBuffer=new StringBuffer();
+//funLeaderBuffer.append(chain.getFunLeader());
+//String mgrLine=chain.getManager();
+//String funLeaderLine=chain.getFunLeader();
+//while(true) {
+//	String tempMgrLine=mgrMap.get(mgrLine);
+////	System.out.println("tempMgrLine: "+tempMgrLine+"mgrLine: "+mgrLine);
+//	if(tempMgrLine==null)break;
+//	mgrBuffer.append(tempMgrLine);
+//	mgrLine=tempMgrLine;
+//}
+//while(true) {
+//	String tempFunLine=funLeaderMap.get(funLeaderLine);
+////	System.out.println("tempFunLine: "+tempFunLine+"funLeaderLine: "+funLeaderLine);
+//	if(tempFunLine==null)break;
+//	funLeaderBuffer.append(tempFunLine);
+//	funLeaderLine=tempFunLine;
+//}
+////System.out.println("^^^^^^^^^^^^"+mgrBuffer);
+////System.out.println("^^^^^^^^^^^^"+funLeaderBuffer);
+////System.out.println(funSerial.contains(serialCc));
+//if(mgrBuffer.toString().equals(funLeaderBuffer.toString()) && funSerial.contains(serialCc)) {
+////	System.out.println("^^>>>>>>>>>>>>>");
+//	break;
+//}

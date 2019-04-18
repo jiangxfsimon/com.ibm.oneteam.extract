@@ -1,7 +1,5 @@
 package com.ibm.extract.model;
 
-import org.aspectj.weaver.patterns.ThisOrTargetAnnotationPointcut;
-
 public class EntityInfoChain extends EntityInfo {
 	private String chain="";
 	

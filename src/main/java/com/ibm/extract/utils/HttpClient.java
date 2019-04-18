@@ -142,7 +142,6 @@ public class HttpClient {
 	
 	public Map<String,String> requestBluePageForMap(List<String> serialCcs) {
 		String value = null;
-		
 		Map<String, String> jobResponses=new HashMap<String, String>();
 		try {
 			SearchControls getFields = new SearchControls();

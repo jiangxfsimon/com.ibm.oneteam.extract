@@ -24,6 +24,13 @@ public class WebXml implements WebApplicationInitializer {
 		Dynamic servlet = context.addServlet("dispatcher", new DispatcherServlet(ctx));
 		servlet.addMapping("/");
 		servlet.setLoadOnStartup(1);
+		
+		/*
+		 * javax.servlet.FilterRegistration.Dynamic charcterFilter =
+		 * context.addFilter("encodingFilter", CharacterEncodingFilter.class);
+		 * charcterFilter.setInitParameter("encoding", "UTF-8");
+		 * servlet.addMapping("/"); servlet.setLoadOnStartup(2);
+		 */
 	}
 
 }

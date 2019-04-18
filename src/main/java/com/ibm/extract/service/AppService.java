@@ -5,20 +5,15 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 
 import javax.annotation.Resource;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.google.common.collect.Lists;
 import com.ibm.extract.config.Configure;
 import com.ibm.extract.dao.impl.IAppDao;
 import com.ibm.extract.enums.Request;
@@ -28,7 +23,6 @@ import com.ibm.extract.model.EntityInfo;
 import com.ibm.extract.model.EntityInfoChain;
 import com.ibm.extract.model.OrgCode;
 import com.ibm.extract.service.impl.IAppService;
-import com.ibm.extract.thread.BatchThread;
 import com.ibm.extract.utils.HttpClient;
 import com.ibm.extract.utils.Utils;
 
@@ -48,13 +42,6 @@ public class AppService implements IAppService {
 	private Utils utils;
 	
 	
-	private static String AllUID;
-	
-	
-	public static String getAllUID() {
-		return AllUID;
-	}
-	
 	@Override
 	public List<App> getAllApp() {
 		return appDao.getAllApp();
@@ -70,6 +57,8 @@ public class AppService implements IAppService {
 //		System.out.println("baseChains: "+baseChains);
 		return baseChains;
 	}
+	
+	
 	@Override
 	public List<String> getRequestsBySpecificApp(String appCode) {
 		List<String> serialCcs=null;
@@ -95,6 +84,17 @@ public class AppService implements IAppService {
 		return serialCcs;
 	}
 	@Override
+	public Map<String, List<String>> getRequestsByMultiApp(String multiApps) {
+		Map<String, List<String>> maps=new HashMap<>();
+		List<String> multiAppList=Arrays.asList(multiApps.split(","));
+		for(String appCode:multiAppList) {
+			maps.put(appCode, getRequestsBySpecificApp(appCode));
+		}
+		System.out.println(maps);
+		return maps;
+	}
+	
+	@Override
 	public Map<String, Object> getUpLineChain(String serialCcs) {
 		Map<String, Object> map=new HashMap<String,Object>();
 		List<String> specialEmp=appDao.getSpecialEmp();
@@ -105,32 +105,72 @@ public class AppService implements IAppService {
 		Map<String, String> mgrMap=new HashMap<String, String>();
 		Map<String, String> funLeaderMap=new HashMap<String, String>();
 		Map<String, String> jopResponses=new HashMap<String, String>();
+//		Set<MissingChain> missingChains=new HashSet<MissingChain>();
+		
 		Set<String> allUId=new HashSet<String>();
+		
+		
+		List<String> mgrSerialCc=null;
+		List<Chain> mgrChains=null;
+		
+		
+		while(true) {
+			Set<String> bpMissing=new HashSet<String>();
+			Set<String> funMissing=new HashSet<String>();
 		//get Manager up line
 		while(true) {
-			List<Chain> mgrChains=appDao.getUpMgrLine(serialCcs);
+			mgrChains=appDao.getUpMgrLine(serialCcs);
 //			System.out.println("mgrChains: "+mgrChains);
-			List<String> mgrSerialCc=new ArrayList<String>();
+			mgrSerialCc=new ArrayList<String>();
 			for(Chain entity:mgrChains) {
 				mgrSerialCc.add(entity.getManager());
 				if(entity.getUser().equals(entity.getManager())) continue;
+				//missed chain
+				if(null!=entity.getFunLeader() && !entity.getFunLeader().equals(entity.getManager()) && mgrMap.get(entity.getFunLeader())==null) {
+//					missingUser=new MissingChain(entity.getFunLeader(), true, true);
+					mgrSerialCc.add(entity.getFunLeader());
+					bpMissing.add(entity.getFunLeader());
+				}
 				mgrMap.put(entity.getUser(),entity.getManager());
 			}
 			serialCcs=utils.removeSpecialEmp(mgrSerialCc, specialEmpRegEx);
 //			System.out.println("serialCcs++: "+serialCcs);
-			if(serialCcs.length()==0) {
-				break;
-			}
+			if(serialCcs.length()==0) break;
 		}
-		System.out.println("funLeaderSerialCcs:**** "+funLeaderSerialCcs);
+		System.out.println("funLeaderSerialCcs: "+funLeaderSerialCcs);
+		
+		
+		if(funLeaderSerialCcs.length()==0) {
+			System.out.println("--"+bpMissing);
+			if(bpMissing.size()==0) {
+				break;
+			}else {
+				funLeaderSerialCcs=utils.listToString(bpMissing);
+			}
+		}else {
+			System.out.println("=="+bpMissing);
+			funLeaderSerialCcs=funLeaderSerialCcs+","+utils.listToString(bpMissing);
+		}
+		List<Chain> funLeaderChains=null;
+		List<String> tempFunLeaderSerialCcs=null;
+		System.out.println("??mgrMap: "+mgrMap);
 		//get function leader up line
 		while(true) {
-			List<Chain> funLeaderChains=appDao.getUpFunLeaderLine(funLeaderSerialCcs);
-			System.out.println("funLeaderChains: "+funLeaderChains);
-			List<String> tempFunLeaderSerialCcs=new ArrayList<String>();
+			funLeaderChains=appDao.getUpFunLeaderLine(funLeaderSerialCcs);
+//			System.out.println("funLeaderChains: "+funLeaderChains);
+			tempFunLeaderSerialCcs=new ArrayList<String>();
 			for(Chain entity:funLeaderChains) {
 //				System.out.println("FunLeader: "+entity.getFunLeader());
 				if(entity.getFunLeader()!=null && !entity.getFunLeader().equals("")) {
+					//missed chain
+					if(!entity.getFunLeader().equals(entity.getManager()) && funLeaderMap.get(entity.getManager())==null) {
+						System.out.println("funleader not equals manager");
+						tempFunLeaderSerialCcs.add(entity.getManager());
+						if(mgrMap.get(entity.getManager())==null) {
+							System.out.println("funMissing:'''''''' "+entity.getManager());
+							funMissing.add(entity.getManager());
+						}
+					}
 					tempFunLeaderSerialCcs.add(entity.getFunLeader());
 					funLeaderMap.put(entity.getUser(), entity.getFunLeader());
 				}else {
@@ -145,55 +185,32 @@ public class AppService implements IAppService {
 //			funLeaderSerialCcs=utils.listToString(tempFunLeaderSerialCcs);
 			System.out.println("funLeaderSerialCc++: "+funLeaderSerialCcs);
 		}
+		System.out.println("funMissing: "+funMissing);
+		serialCcs=utils.removeSpecialEmp(funMissing, specialEmpRegEx);
+		if(serialCcs.length()==0 && funLeaderSerialCcs.length()==0) break;
+		}
+		//get bp manager from funMissing
+//		String funMissSerialNum=utils.listToString(funMissing);
+		
+		
+		
+//		System.out.println("funMissing: "+funMissing);
 		System.out.println("mgrMap: "+mgrMap);
 		System.out.println("funLeaderMap: "+funLeaderMap);
-		
+	
+		//get all user's serialCc
 		allUId=utils.mapToSet(mgrMap,funLeaderMap);
 		String allUIdStr=utils.listToString(allUId);
 		
-//		AllUID=allUIdStr;
-		//get all the user id's serial&cc to fetch job response by BP api
-		jopResponses.putAll(utils.startBatchThread(allUIdStr));
+		
+		
+		//get all the user id's serial&cc to fetch jobresponse by BP api
+//		jopResponses.putAll(utils.startBatchThread(allUIdStr));
+		jopResponses.putAll(utils.enableThread(allUIdStr));
 		System.out.println("jobResponses: "+jopResponses);
 		
-//			// 1. 将 serialCC 转化为 list
-//				List<String> serialccList = Arrays.asList(allUIdStr.split(","));
-//				// 2. 拆分 list
-//				int size = serialccList.size();
-//				// 最多启用 10 个线程
-//				int maxNumber = 9, minSize = 20;
-//				Map<String, String> resultMap = new HashMap<String, String>();
-//				if(size > minSize) {
-//					int partNumber = size/maxNumber;
-//					System.out.println("partNumber: "+partNumber);
-//					List<List<String>> seriaLists = Lists.partition(serialccList, partNumber);
-//					System.out.println("^^^^^^^^^^^ "+seriaLists.size());
-//					CountDownLatch latch = new CountDownLatch(seriaLists.size());
-//					System.out.println("将启动 : " + seriaLists.size() + " 个线程");
-//					for(int i = 0; i < seriaLists.size(); i++) {
-//						BatchThread batchThread = new BatchThread(latch, httpClient, resultMap, seriaLists.get(i));
-//						new Thread(batchThread).start();
-//					}
-//					try {
-//						latch.await();
-//					} catch (InterruptedException e) {
-//						e.printStackTrace();
-//					}
-//				} else {
-//					resultMap = httpClient.requestBluePageForMap(serialccList);
-//				}
-//				
-//				System.out.println(resultMap);
-//				System.out.println("******************" + resultMap.size());
-		
-
-		
-//		Map<String, String> jobResponses=utils.enableThread(allUIdStr);
-//		System.out.println("jobResponses: "+jobResponses);
-		
-		
-		
 		List<Chain> allUIdChains=appDao.getChain(allUIdStr);
+		
 		
 		map.put("mgrMap", mgrMap);
 		map.put("funLeaderMap", funLeaderMap);
@@ -245,8 +262,7 @@ public class AppService implements IAppService {
 		Map<String, Chain> chainMap=new HashMap<String, Chain>();
 		Map<String, OrgCode> orgCodeMap=new HashMap<String,OrgCode>();
 		Map<String, String> jobResponses=new HashMap<String, String>();
-//		Map<String, String> jobResponses=new HashMap<String, String>();
-
+		
 		mgrMap=(Map<String, String>) maps.get("mgrMap");
 		funLeaderMap=(Map<String, String>) maps.get("funLeaderMap");
 		chainMap=(Map<String, Chain>) maps.get("allEntity");
@@ -262,7 +278,6 @@ public class AppService implements IAppService {
 			if(chain!=null) {
 				OrgCode orgCode=orgCodeMap.get(chain.getBpOrgCode());											
 				list.add(new EntityInfo(serialCc, chain.getUserNotes(), chain.getFunLeaderNotes(), chain.getFunLeader(), chain.getMgrNotes(),
-									//set jobResponse as ""
 				chain.getManager(), jobResponses.get(serialCc), chain.getBpOrgCode(), orgCode.getHrOrgDisplay(), orgCode.getHrUnitId()));
 			}else {
 //				throw new RuntimeException("The serial&cc not match...");

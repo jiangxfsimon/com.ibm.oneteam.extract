@@ -1,6 +1,9 @@
 package com.ibm.extract.aop;
 
 import java.lang.reflect.Method;
+
+import javax.annotation.Resource;
+
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -12,6 +15,7 @@ import org.springframework.stereotype.Component;
 import com.ibm.extract.annotation.DataBase;
 import com.ibm.extract.config.DynamicDataSource;
 import com.ibm.extract.constant.DBInfo;
+import com.ibm.extract.utils.Utils;
 
 /**
  * @author FuDu
@@ -21,6 +25,8 @@ import com.ibm.extract.constant.DBInfo;
 @Component
 @Aspect
 public class AspectDataBase {
+	@Resource
+	private Utils utils;
 	@Pointcut(DBInfo.dataBasePointCutExpression)
 	public void pointCut() { }
 	
@@ -34,6 +40,7 @@ public class AspectDataBase {
 		DataBase dataBase = method.getAnnotation(DataBase.class);
 		if(null != dataBase) {
 			DynamicDataSource.setDBType(dataBase.value());
+//			System.out.println(utils.dateFormat(DateFormat.dateFormat1.value()) + "当前使用的数据库是: " + dataBase.value());
 			Object result = pjp.proceed();
 			DynamicDataSource.clearDBType();
 			return result;

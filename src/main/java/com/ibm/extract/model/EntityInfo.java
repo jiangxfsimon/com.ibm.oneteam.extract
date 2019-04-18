@@ -63,6 +63,7 @@ public class EntityInfo {
 			return attr;
 	}
 	
+	
 
 	public String getFunLeaderCnum() {
 		if(funLeaderCnum==null || funLeaderCnum.equals("")) {

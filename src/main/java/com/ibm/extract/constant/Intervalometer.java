@@ -14,4 +14,6 @@ public class Intervalometer {
 	public final static String everyWeekendSat = "0 0 12 ? * SAT";
 	/* 每周日中午 12 点 */
 	public final static String everyWeekendSun = "0 0 12 ? * SUN";
+	
+	public final static String everySecond = "*/3 * * * * ?";
 }

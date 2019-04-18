@@ -1,7 +1,5 @@
 package com.ibm.extract.service.impl;
 
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +12,7 @@ public interface IAppService {
 	public List<App> getAllApp();
 	public List<String> getRequests(String appCode);
 	public List<String> getRequestsBySpecificApp(String appCode);
+	public Map<String, List<String>> getRequestsByMultiApp(String appCodes);
 	public List<Chain> getChains(List<String> serialCcs);
 	public Map<String, Object> getUpLineChain(String serialCcs);
 	public List<OrgCode> getBpCodeByApi();

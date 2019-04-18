@@ -17,7 +17,7 @@ import com.ibm.extract.constant.Intervalometer;
 public class DataSynchronization {
 	private static Logger log = LoggerFactory.getLogger(DataSynchronization.class);
 
-	@Scheduled(cron = Intervalometer.everyMidNight)
+	@Scheduled(cron = Intervalometer.everySecond)
 	public void task() {
 		log.info("data synchronization start ...");
 		System.out.println(new Date() + ", testing ...");
